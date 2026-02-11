@@ -1,0 +1,191 @@
+generator client {
+    provider        = "prisma-client"
+    output          = "../src/generated/prisma"
+    previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum SupportStatus {
+    PENDING
+    IN_PROGRESS
+    RESOLVED
+    REJECTED
+}
+
+enum TargetType {
+    topic
+    token
+}
+
+enum Status {
+    SENT
+    FAILED
+}
+
+model Account {
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? @db.Text
+    access_token      String? @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? @db.Text
+    session_state     String?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    userId       String
+    expires      DateTime
+    sessionToken String   @unique
+    accessToken  String   @unique
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+    id         String    @id @default(cuid())
+    identifier String?
+    userId     String?
+    token      String    @unique
+    expires    DateTime?
+    user       User?     @relation(fields: [userId], references: [id])
+
+    @@unique([identifier, token])
+}
+
+model User {
+    id                 String              @id @default(cuid())
+    name               String
+    email              String?
+    mobile             String              @unique
+    emailVerified      DateTime?
+    password           String
+    address            String?
+    city               String?
+    state              String?
+    image              String?
+    userRole           String
+    userStatus         String?
+    fcmToken           String?
+    createdAt          DateTime            @default(now())
+    accounts           Account[]
+    sessions           Session[]
+    verificationTokens VerificationToken[]
+    supports           Support[]
+    tokens             Token[]
+    jobPostedBy        Job[]               @relation("JobPostedBy")
+    jobFinishedBy      Job[]               @relation("JobFinishedBy")
+}
+
+model Support {
+    id         String        @id @default(uuid())
+    mobile     String
+    queryType  String
+    message    String
+    photo      String? // The proof image URL
+    status     SupportStatus @default(PENDING)
+    adminReply String?
+    resolvedAt DateTime?
+    createdAt  DateTime      @default(now())
+    updatedAt  DateTime      @updatedAt
+    postedBy   User          @relation(fields: [postedById], references: [mobile])
+    postedById String
+}
+
+model Job {
+    id            Int       @id @default(autoincrement())
+    description   String?
+    category      String?
+    location      String
+    paymentStatus String    @default("PENDING")
+    status        String    @default("ACTIVE")
+    cost          String
+    jobPhoto      String
+    jobPhotoDone  String?
+    createdAt     DateTime  @default(now())
+    finishedAt    DateTime?
+    postedBy      User      @relation("JobPostedBy", fields: [postedById], references: [mobile])
+    postedById    String
+    finishedBy    User?     @relation("JobFinishedBy", fields: [finishedById], references: [mobile])
+    finishedById  String?
+}
+
+model Token {
+    id           Int       @id @default(autoincrement())
+    orderNumber  String
+    mobileNumber String
+    orderCode    String
+    quantity     Int?
+    tokenCode    String
+    tokenStatus  String    @default("REQUESTED")
+    createdAt    DateTime  @default(now())
+    receivedAt   DateTime?
+    postedBy     User?     @relation(fields: [postedById], references: [mobile])
+    postedById   String?
+
+    @@index([createdAt])
+}
+
+model Order {
+    id                Int       @id @default(autoincrement())
+    orderNumber       String    @unique
+    email             String
+    name              String
+    address           String?
+    city              String?
+    state             String?
+    pincode           String?
+    description       String?
+    mobile            String?
+    amount            String?
+    discount          String?
+    shipping          String?
+    totalAmount       String?
+    orderItem         Json
+    orderStatus       String?
+    paymentId         String?
+    paymentStatus     String?
+    orderDate         DateTime  @default(now())
+    orderDispatchDate DateTime?
+}
+
+model Subscription {
+    id       String @id @default(uuid())
+    endpoint String @unique // The unique URL for the user's browser
+    p256dh   String // Public key for encryption
+    auth     String // Auth secret
+
+    // Optional: Link to a User/Admin if you have authentication
+    // userId    String? 
+    // user      User?   @relation(fields: [userId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model NotificationLog {
+    id           String     @id @default(uuid())
+    title        String
+    body         String
+    targetType   TargetType
+    target       String
+    status       Status     @default(SENT)
+    messageId    String?
+    sentAt       DateTime   @default(now())
+    errorDetails String?
+
+    @@index([sentAt]) // Optimize sorting by date
+}
