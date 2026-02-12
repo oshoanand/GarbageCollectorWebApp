@@ -38,9 +38,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isFocused, setIsFocused] = useState(false); // Track focus state for phone input
 
-  // --- EFFECTS ---
-
-  // 1. Redirect if already logged in
+  // Redirect if already logged in
   useEffect(() => {
     if (status === "authenticated") {
       const userRole = (session?.user as any)?.role || "VISITOR";
@@ -49,15 +47,13 @@ export default function LoginPage() {
     }
   }, [status, session, router]);
 
-  // 2. Show error from URL if present (e.g. NextAuth redirect)
+  // Show error from URL if present (e.g. NextAuth redirect)
   useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam) {
       setError("Ошибка аутентификации. Проверьте данные.");
     }
   }, [searchParams]);
-
-  // --- HANDLERS ---
 
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Masking Logic: +7 XXX XXX XX-XX

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useSession } from "next-auth/react";
 import * as z from "zod";
 import {
   User,
@@ -42,6 +43,8 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+  const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   // --- STATE ---
@@ -49,6 +52,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isPhoneFocused, setIsPhoneFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   // --- FORM HOOK ---
   const {
@@ -70,6 +74,23 @@ export default function RegisterPage() {
 
   // Watch mobile value for checkmark logic
   const mobileValue = watch("mobile");
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (status === "authenticated") {
+      const userRole = (session?.user as any)?.role || "VISITOR";
+      const target = userRole === "COLLECTOR" ? "/collector" : "/visitor";
+      router.replace(target);
+    }
+  }, [status, session, router]);
+
+  // Show error from URL if present (e.g. NextAuth redirect)
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setError("Ошибка аутентификации. Проверьте данные.");
+    }
+  }, [searchParams]);
 
   // --- HANDLERS ---
 
