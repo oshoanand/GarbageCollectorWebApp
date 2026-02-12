@@ -33,7 +33,7 @@ const useFcmToken = () => {
             });
 
             if (currentToken) {
-              console.log("🔥 FCM Token Generated:", currentToken);
+              // console.log("🔥 FCM Token Generated:", currentToken);
 
               // 3. Send to Backend
               // We only do this if the user is logged in

@@ -44,6 +44,6 @@ export const config = {
      * - reset-password (public password reset page)
      */
 
-    "/((?!api|_next/static|_next/image|favicon.ico|images|icons|public|login|register|reset-password|firebase-messaging-sw.js).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|images|icons|public|login|register|reset-password|firebase-messaging-sw.js|manifest.json).*)",
   ],
 };
