@@ -123,8 +123,6 @@ export const authOptions: NextAuthOptions = {
         session.user.image = token.image as string | null | undefined;
         session.user.name = token.name;
         session.user.email = token.email;
-
-        // Pass custom fields to the client
         (session.user as any).role = token.role;
         (session.user as any).mobile = token.mobile;
         (session as any).accessToken = token.accessToken;

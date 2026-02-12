@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // --- CUSTOM HOOKS & UTILS ---
 import { useUpdateProfileImage, useUpdateProfileName } from "@/services/user";
+import { useCreateSupportTicket } from "@/services/support";
 import { toast } from "@/hooks/use-toast";
 
 // --- TYPES ---
@@ -29,14 +30,13 @@ interface UserProfile {
   image?: string;
 }
 
-interface CollectorProfileScreenProps {
+interface VisitorProfileScreenProps {
   onLogout?: () => void;
 }
 
 export default function VisitorProfileScreen({
   onLogout,
-}: CollectorProfileScreenProps) {
-  // 1. Destructure 'update' from useSession
+}: VisitorProfileScreenProps) {
   const { data: session, status, update } = useSession();
 
   // --- STATE ---
@@ -54,7 +54,6 @@ export default function VisitorProfileScreen({
   const [supportType, setSupportType] = useState("BUG");
   const [problemDescription, setProblemDescription] = useState("");
   const [problemImage, setProblemImage] = useState<File | null>(null);
-  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
 
   // File Input Refs
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +62,7 @@ export default function VisitorProfileScreen({
 
   // --- MUTATIONS ---
 
-  // 2. Update Profile Image
+  // 1. Update Profile Image
   const { mutate: uploadImage, isPending: isUploadingImage } =
     useUpdateProfileImage(
       async (data) => {
@@ -72,11 +71,8 @@ export default function VisitorProfileScreen({
           description: "Ваша фотография профиля успешно изменена.",
           variant: "success",
         });
-
-        // CRITICAL: Update the session with the new image URL returned by backend
         if (data.imageUrl) {
           await update({ image: data.imageUrl });
-          // Ensure local state is consistent with backend
           setUserProfile((prev) =>
             prev ? { ...prev, image: data.imageUrl } : null,
           );
@@ -92,7 +88,7 @@ export default function VisitorProfileScreen({
       },
     );
 
-  // 3. Update Profile Name
+  // 2. Update Profile Name
   const { mutate: updateName, isPending: isUpdatingName } =
     useUpdateProfileName(
       async (data) => {
@@ -102,8 +98,6 @@ export default function VisitorProfileScreen({
           variant: "success",
         });
         setIsEditingName(false);
-
-        // CRITICAL: Update the session with the new name
         if (data.name) {
           await update({ name: data.name });
           setUserProfile((prev) =>
@@ -121,13 +115,34 @@ export default function VisitorProfileScreen({
       },
     );
 
+  // 3. Create Support Ticket (NEW)
+  const { mutate: submitTicket, isPending: isSubmittingTicket } =
+    useCreateSupportTicket(
+      () => {
+        setShowSupportSheet(false);
+        setProblemDescription("");
+        setProblemImage(null);
+        toast({
+          title: "Отправлено",
+          description: "Ваше сообщение успешно отправлено в службу поддержки.",
+          variant: "success",
+        });
+      },
+      (error) => {
+        toast({
+          title: "Ошибка",
+          description: error.message || "Не удалось отправить запрос.",
+          variant: "destructive",
+        });
+      },
+    );
+
   // --- HELPERS ---
 
   // Mask Phone: +7 XXX XXX XX-XX
   const formatPhoneNumber = (phone: string) => {
     if (!phone) return "";
     const cleaned = phone.replace(/\D/g, "");
-
     if (cleaned.length >= 10) {
       const tail = cleaned.slice(-10);
       return `+7 ${tail.substring(0, 3)} ${tail.substring(3, 6)} ${tail.substring(6, 8)}-${tail.substring(8, 10)}`;
@@ -167,13 +182,8 @@ export default function VisitorProfileScreen({
       return;
     }
     const rawMobile = (session?.user as any)?.mobile;
-
-    // Call Mutation
     if (rawMobile) {
-      updateName({
-        name: nameInput,
-        mobile: rawMobile,
-      });
+      updateName({ name: nameInput, mobile: rawMobile });
     } else {
       toast({
         title: "Ошибка",
@@ -197,7 +207,7 @@ export default function VisitorProfileScreen({
         return;
       }
 
-      // Optimistic UI Update (Shows immediately)
+      // Optimistic UI Update
       const reader = new FileReader();
       reader.onload = (ev) => {
         setUserProfile((prev) =>
@@ -207,16 +217,42 @@ export default function VisitorProfileScreen({
       reader.readAsDataURL(file);
 
       // Call Mutation
-      uploadImage({
-        file: file,
-        mobile: rawMobile,
-      });
+      uploadImage({ file: file, mobile: rawMobile });
 
-      // Cleanup UI
+      // Cleanup
       setShowImageSourceDialog(false);
       if (cameraInputRef.current) cameraInputRef.current.value = "";
       if (galleryInputRef.current) galleryInputRef.current.value = "";
     }
+  };
+
+  const handleSubmitSupport = () => {
+    if (!problemDescription.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Пожалуйста, опишите проблему.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const rawMobile = (session?.user as any)?.mobile;
+    if (!rawMobile) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось определить пользователя.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Call Mutation
+    submitTicket({
+      mobile: rawMobile,
+      support_type: supportType,
+      description: problemDescription,
+      proof: problemImage,
+    });
   };
 
   const handleShareApp = async () => {
@@ -240,31 +276,6 @@ export default function VisitorProfileScreen({
         variant: "success",
       });
     }
-  };
-
-  const handleSubmitSupport = () => {
-    if (!problemDescription) {
-      toast({
-        title: "Ошибка",
-        description: "Пожалуйста, опишите проблему.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsSubmittingTicket(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmittingTicket(false);
-      setShowSupportSheet(false);
-      setProblemDescription("");
-      setProblemImage(null);
-      toast({
-        title: "Отправлено",
-        description: "Ваше сообщение успешно отправлено в службу поддержки.",
-        variant: "success",
-      });
-    }, 1500);
   };
 
   // Loading State
@@ -461,19 +472,22 @@ export default function VisitorProfileScreen({
       <AnimatePresence>
         {showSupportSheet && (
           <>
+            {/* Backdrop: z-index 90 (Below Sheet) */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-50"
+              className="fixed inset-0 bg-black/50 z-[90]"
               onClick={() => setShowSupportSheet(false)}
             />
+
+            {/* Sheet: z-index 100 (Above Bottom Bar) + Added Bottom Padding */}
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 bg-white z-50 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto pb-safe"
+              className="fixed bottom-0 left-0 right-0 bg-white z-[100] rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto pb-10"
             >
               <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6" />
               <div className="flex justify-between items-center mb-6">

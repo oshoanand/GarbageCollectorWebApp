@@ -13,7 +13,7 @@ declare module "next-auth" {
       mobile: string;
       image?: string | null;
       email?: string | null;
-      userType: string;
+      role: string | null;
     };
   }
 
@@ -26,7 +26,7 @@ declare module "next-auth" {
     mobile: string;
     image?: string | null;
     email?: string | null;
-    userType: string;
+    role: string | null;
     accessToken: string;
   }
 }

@@ -94,7 +94,7 @@ export default function LoginPage() {
       const result = await signIn("credentials", {
         mobile: cleanMobile,
         password,
-        role, // Pass selected role to backend
+        role,
         redirect: false,
       });
 
