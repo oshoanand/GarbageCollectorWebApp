@@ -2,6 +2,9 @@ import withPWA from "@ducanh2912/next-pwa";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {
+    resolveExtensions: [".mdx", ".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
+  },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "via.placeholder.com" }],
   },
