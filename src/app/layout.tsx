@@ -6,8 +6,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "EcoCollect",
-  description: "Marketplace for garbage collection",
+  title: "Услуги64",
+  description: "garbage collection",
 };
 
 export const viewport: Viewport = {
