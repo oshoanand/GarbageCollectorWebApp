@@ -38,7 +38,7 @@ const useFcmToken = () => {
               // 3. Send to Backend
               // We only do this if the user is logged in
               if (session?.user) {
-                await syncTokenWithBackend(currentToken);
+                await syncTokenWithBackend(currentToken, session?.user?.mobile);
               }
             }
           }
@@ -79,12 +79,12 @@ const useFcmToken = () => {
 /**
  * Sends token to backend. Backend handles DB save AND Topic Subscriptions.
  */
-async function syncTokenWithBackend(token: string) {
+async function syncTokenWithBackend(token: string, mobile: string) {
   try {
     await apiRequest({
       method: "POST",
       url: "/api/fcm/save-fcm",
-      data: { token },
+      data: { token, mobile },
     });
     console.log("✅ Token synced with backend");
   } catch (error) {

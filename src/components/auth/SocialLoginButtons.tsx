@@ -20,7 +20,7 @@ export default function SocialLoginButtons({
   // 2. Default to role-based dashboard
   const callbackUrl =
     searchParams.get("callbackUrl") ||
-    (userRole === "COLLECTOR" ? "/collector/jobs" : "/visitor/my-jobs");
+    (userRole === "COLLECTOR" ? "/collector" : "/visitor");
 
   const handleSocialLogin = async (provider: string) => {
     setIsLoading(provider);

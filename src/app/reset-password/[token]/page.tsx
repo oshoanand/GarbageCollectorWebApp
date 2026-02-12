@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+// 1. Import useParams
+import { useRouter, useParams } from "next/navigation";
 import {
   Phone,
   Lock,
@@ -17,12 +18,13 @@ import { clsx } from "clsx";
 import { toast } from "sonner";
 import Link from "next/link";
 
-export default function ResetPasswordPage({
-  params,
-}: {
-  params: { token: string };
-}) {
+// 2. Remove 'async' and the 'params' prop
+export default function ResetPasswordPage() {
   const router = useRouter();
+
+  // 3. Get the token using the hook instead
+  const params = useParams<{ token: string }>();
+  const token = params.token;
 
   // --- STATE ---
   const [mobile, setMobile] = useState("");
@@ -84,15 +86,18 @@ export default function ResetPasswordPage({
 
     try {
       // API Call
-      const res = await fetch(`/api/auth/reset-password/${params.token}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: params.token, // Token from URL
-          mobile: cleanMobile, // Extra verification
-          newPassword: password,
-        }),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/reset-password/${token}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token: token, // Token from URL hook
+            mobile: cleanMobile, // Extra verification
+            password: password,
+          }),
+        },
+      );
 
       const data = await res.json();
 

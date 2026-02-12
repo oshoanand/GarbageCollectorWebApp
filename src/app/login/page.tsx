@@ -44,8 +44,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (status === "authenticated") {
       const userRole = (session?.user as any)?.role || "VISITOR";
-      const target =
-        userRole === "COLLECTOR" ? "/collector/jobs" : "/visitor/my-jobs";
+      const target = userRole === "COLLECTOR" ? "/collector" : "/visitor";
       router.replace(target);
     }
   }, [status, session, router]);

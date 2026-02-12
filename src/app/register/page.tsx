@@ -122,8 +122,7 @@ export default function RegisterPage() {
         mobile: cleanMobile,
         password: data.password,
         role: selectedRole,
-        callbackUrl:
-          selectedRole === "COLLECTOR" ? "/collector/jobs" : "/visitor/my-jobs",
+        callbackUrl: selectedRole === "COLLECTOR" ? "/collector" : "/visitor",
       });
     } catch (error: any) {
       console.error(error);
