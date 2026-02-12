@@ -2,9 +2,9 @@ import { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "EcoCollect",
-    short_name: "EcoCollect",
-    description: "Garbage Collection Marketplace",
+    name: "Услуги64",
+    short_name: "Услуги64",
+    description: "Garbage Collection ",
     start_url: "/",
     display: "standalone",
     background_color: "#FFFFFF",
