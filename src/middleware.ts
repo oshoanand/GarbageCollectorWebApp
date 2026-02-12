@@ -43,6 +43,7 @@ export const config = {
      * - register (public registration page)
      * - reset-password (public password reset page)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|images|icons|public|login|register|reset-password).*)",
+
+    "/((?!api|_next/static|_next/image|favicon.ico|images|icons|public|login|register|reset-password|firebase-messaging-sw.js).*)",
   ],
 };
