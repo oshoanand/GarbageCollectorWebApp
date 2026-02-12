@@ -29,15 +29,17 @@ import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 
 // --- TYPES & SCHEMA ---
 type UserRole = "VISITOR" | "COLLECTOR";
-
 const registerSchema = z.object({
-  name: z.string().min(2, "Имя должно содержать минимум 2 буквы"),
+  name: z.string().min(6, "Имя должно содержать минимум 6 буквы"),
   mobile: z
     .string()
-    .min(16, "Введите корректный номер телефона") // Length of "+7 999 000-00-00"
+    .min(16, "Введите корректный номер телефона")
     .regex(/^\+7 \d{3} \d{3} \d{2}-\d{2}$/, "Неверный формат номера"),
   email: z.string().email("Введите корректный Email"),
-  password: z.string().min(6, "Пароль должен быть не менее 6 символов"),
+  password: z
+    .string()
+    .min(8, "Пароль должен быть не менее 8 символов")
+    .regex(/[A-Z]/, "Пароль должен содержать хотя бы одну заглавную букву"), // Requires at least one Uppercase
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;

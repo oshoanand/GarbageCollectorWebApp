@@ -1,28 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import OnboardingScreen from "@/components/OnboardingScreen"; // Ensure path matches where you saved the component
 
-export default function OnboardingScreen() {
+export default function OnboardingPage() {
   const router = useRouter();
 
   const handleFinish = () => {
-    // 1. Mark onboarding as complete (ViewModel logic)
+    // 1. Set the specific key your RootDispatcher looks for
     localStorage.setItem("onboarding_complete", "true");
 
-    // 2. Navigate to Login & Clear Backstack
-    // router.replace() acts like popUpTo(inclusive=true)
+    // 2. Redirect to login (Dispatcher handles the rest)
     router.replace("/login");
   };
 
-  return (
-    <div className="h-screen flex flex-col items-center justify-center bg-white">
-      <h1 className="text-2xl font-bold mb-4">Welcome to EcoCollect</h1>
-      <button
-        onClick={handleFinish}
-        className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold"
-      >
-        Get Started
-      </button>
-    </div>
-  );
+  return <OnboardingScreen onFinish={handleFinish} />;
 }
