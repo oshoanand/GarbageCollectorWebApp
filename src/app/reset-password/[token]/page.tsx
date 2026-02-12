@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   Phone,
   Lock,
@@ -13,59 +11,39 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  ArrowLeft,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { toast } from "sonner"; // Ensure you have this installed or use your own toast hook
+import { toast } from "sonner";
+import Link from "next/link";
 
-// --- CUSTOM COMPONENTS ---
-// Make sure these exist at the paths below
-import RoleToggler from "@/components/auth/RoleToggler";
-import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
-
-type UserRole = "VISITOR" | "COLLECTOR";
-
-export default function LoginPage() {
+export default function ResetPasswordPage({
+  params,
+}: {
+  params: { token: string };
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
 
   // --- STATE ---
-  const [role, setRole] = useState<UserRole>("VISITOR");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Visibility Toggles
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // UI States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isFocused, setIsFocused] = useState(false); // Track focus state for phone input
-
-  // --- EFFECTS ---
-
-  // 1. Redirect if already logged in
-  useEffect(() => {
-    if (status === "authenticated") {
-      const userRole = (session?.user as any)?.role || "VISITOR";
-      const target =
-        userRole === "COLLECTOR" ? "/collector/jobs" : "/visitor/my-jobs";
-      router.replace(target);
-    }
-  }, [status, session, router]);
-
-  // 2. Show error from URL if present (e.g. NextAuth redirect)
-  useEffect(() => {
-    const errorParam = searchParams.get("error");
-    if (errorParam) {
-      setError("Ошибка аутентификации. Проверьте данные.");
-    }
-  }, [searchParams]);
+  const [isMobileFocused, setIsMobileFocused] = useState(false);
 
   // --- HANDLERS ---
 
+  // Exact Masking Logic from Login Page
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Masking Logic: +7 XXX XXX XX-XX
     let value = e.target.value.replace(/\D/g, "");
     if (value.startsWith("7")) value = value.substring(1);
-
-    // Limit to 10 digits (excluding +7)
     value = value.substring(0, 10);
 
     let formatted = "";
@@ -76,10 +54,10 @@ export default function LoginPage() {
     if (value.length >= 9) formatted += "-" + value.substring(8, 10);
 
     setMobile(formatted);
-    if (error) setError(""); // Clear error on typing
+    if (error) setError("");
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -95,31 +73,38 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
+    if (password !== confirmPassword) {
+      setError("Пароли не совпадают");
+      setLoading(false);
+      return;
+    }
 
-    // SANITIZATION: +7 999 000-00-00 -> 9990000000
+    // 2. Prepare Data
     const cleanMobile = mobile.replace(/\D/g, "").slice(-10);
 
     try {
-      const result = await signIn("credentials", {
-        mobile: cleanMobile,
-        password,
-        role,
-        redirect: false,
+      // API Call
+      const res = await fetch(`/api/auth/reset-password/${params.token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: params.token, // Token from URL
+          mobile: cleanMobile, // Extra verification
+          newPassword: password,
+        }),
       });
 
-      if (result?.error) {
-        setError("Неверный номер или пароль");
-        toast.error("Ошибка входа");
-        setLoading(false);
-      } else {
-        toast.success("Вход выполнен успешно");
-        // Redirect handled by useEffect or explicit push
-        const target = role === "COLLECTOR" ? "/collector" : "/visitor";
-        router.push(target);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Ошибка сброса пароля");
       }
-    } catch (err) {
-      console.error(err);
-      setError("Произошла ошибка сети");
+
+      toast.success("Пароль успешно изменен");
+      router.push("/login");
+    } catch (err: any) {
+      setError(err.message || "Произошла ошибка");
+    } finally {
       setLoading(false);
     }
   };
@@ -129,7 +114,6 @@ export default function LoginPage() {
       {/* 1. LOGO AREA */}
       <div className="w-full h-[130px] flex items-center justify-center mb-6">
         <div className="relative w-[120px] h-[120px]">
-          {/* Ensure /public/images/logo.svg exists */}
           <Image
             src="/images/logo.svg"
             alt="Logo"
@@ -141,50 +125,44 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full max-w-sm flex flex-col items-center">
-        {/* 2. ROLE TOGGLER */}
-        <RoleToggler selectedRole={role} onSelect={setRole} />
-
-        <p className="mt-4 mb-6 text-sm font-medium text-gray-500 text-center">
-          Войдите как{" "}
-          <span className="font-bold text-green-600">
-            {role === "VISITOR" ? "Заказчик" : "Исполнитель"}
-          </span>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Новый пароль</h2>
+        <p className="text-gray-500 text-sm text-center mb-8">
+          Введите номер телефона для подтверждения и придумайте новый пароль
         </p>
 
-        {/* 3. LOGIN FORM */}
-        <form onSubmit={handleLogin} className="w-full space-y-5">
-          {/* MOBILE INPUT */}
+        <form onSubmit={handleSubmit} className="w-full space-y-5">
+          {/* --- 1. MOBILE NUMBER FIELD --- */}
           <div className="space-y-1">
             <div className="relative group">
-              {/* Prefix Icon */}
+              {/* Icon */}
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200">
                 <Phone
                   className={clsx(
                     "h-5 w-5 transition-colors",
-                    isFocused || mobile.length > 0
+                    isMobileFocused || mobile.length > 0
                       ? "text-green-600"
                       : "text-gray-400",
                   )}
                 />
               </div>
 
+              {/* Input */}
               <input
                 type="tel"
                 value={mobile}
                 onChange={handleMobileChange}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
+                onFocus={() => setIsMobileFocused(true)}
+                onBlur={() => setIsMobileFocused(false)}
                 placeholder="+7 XXX XXX XX-XX"
                 className={clsx(
                   "block w-full pl-10 pr-10 py-3.5 border rounded-xl text-gray-900 transition-all bg-gray-50 outline-none",
-                  // Dynamic Border Color
                   error && mobile.length < 16
                     ? "border-red-500 bg-red-50 focus:ring-red-200"
                     : "border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:bg-white",
                 )}
               />
 
-              {/* Success Check Icon */}
+              {/* Success Checkmark */}
               {mobile.length === 16 && (
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none animate-in fade-in zoom-in duration-300">
                   <CheckCircle2 className="h-5 w-5 text-green-600 fill-green-50" />
@@ -193,7 +171,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* PASSWORD INPUT */}
+          {/* --- 2. NEW PASSWORD FIELD --- */}
           <div className="space-y-1">
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -203,7 +181,7 @@ export default function LoginPage() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Пароль"
+                placeholder="Новый пароль"
                 className={clsx(
                   "block w-full pl-10 pr-10 py-3.5 border rounded-xl text-gray-900 transition-all bg-gray-50 outline-none",
                   error && password.length < 6
@@ -223,8 +201,40 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+          </div>
 
-            {/* Error Message & Forgot Password */}
+          {/* --- 3. CONFIRM PASSWORD FIELD --- */}
+          <div className="space-y-1">
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
+              </div>
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Подтвердите пароль"
+                className={clsx(
+                  "block w-full pl-10 pr-10 py-3.5 border rounded-xl text-gray-900 transition-all bg-gray-50 outline-none",
+                  error && password !== confirmPassword
+                    ? "border-red-500 bg-red-50 focus:ring-red-200"
+                    : "border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:bg-white",
+                )}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-green-600 transition-colors"
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <Eye className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+            </div>
+
+            {/* Error Message Display */}
             <div className="flex justify-between items-start pt-1 px-1 min-h-[24px]">
               {error ? (
                 <div className="flex items-center text-red-500 text-xs mt-0.5 animate-in slide-in-from-left-2">
@@ -234,13 +244,6 @@ export default function LoginPage() {
               ) : (
                 <div />
               )}
-
-              <Link
-                href="/reset-password"
-                className="text-xs font-bold text-green-600 hover:text-green-700 transition-colors"
-              >
-                Забыли пароль?
-              </Link>
             </div>
           </div>
 
@@ -250,23 +253,23 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full flex items-center justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-base font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Войти"}
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              "Сохранить пароль"
+            )}
           </button>
+
+          {/* BACK LINK */}
+          <div className="text-center mt-4">
+            <Link
+              href="/login"
+              className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-green-600 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" /> Вернуться ко входу
+            </Link>
+          </div>
         </form>
-
-        {/* 4. SOCIAL LOGIN BUTTONS */}
-        <SocialLoginButtons userRole={role} />
-
-        {/* 5. REGISTER LINK */}
-        <div className="mt-8 flex items-center gap-1 text-sm">
-          <span className="text-gray-500">Нет аккаунта?</span>
-          <Link
-            href="/register"
-            className="font-bold text-green-600 hover:text-green-700 hover:underline transition-all"
-          >
-            Зарегистрироваться
-          </Link>
-        </div>
       </div>
     </div>
   );

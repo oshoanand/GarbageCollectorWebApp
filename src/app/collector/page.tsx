@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 
 // --- Import your screens here ---
-// Assuming you have these components created or defined in the same file for now
 import ActiveJobsScreen from "@/components/screens/collector/ActiveJobScreen";
 import CollectorMyJobsScreen from "@/components/screens/collector/CollectorMyJobsScreen";
 import CollectorProfileScreen from "@/components/screens/collector/CollectorProfileScreen";
@@ -18,14 +17,13 @@ type Tab = "ACTIVE_JOBS" | "MY_JOBS" | "PROFILE";
 export default function CollectorHomeHost() {
   const router = useRouter();
 
-  // 1. Navigation State (Replaces homeTabNavController)
+  // 1. Navigation State
   const [currentTab, setCurrentTab] = useState<Tab>("ACTIVE_JOBS");
 
   // 2. FCM Subscription Effect
   useEffect(() => {
-    // Equivalent to FcmTopicSubscriber
     console.log("Subscribing to topic: USER_ROLE_COLLECTOR");
-    // In a real PWA, you would call your firebase.messaging().subscribe() here
+    // In a real PWA, call firebase.messaging().subscribe() here
   }, []);
 
   // 3. Render the Content based on Tab
@@ -34,7 +32,6 @@ export default function CollectorHomeHost() {
       case "ACTIVE_JOBS":
         return (
           <ActiveJobsScreen
-            // Equivalent to onNavigateToMyJobs navigation lambda
             onNavigateToMyJobs={() => setCurrentTab("MY_JOBS")}
           />
         );
@@ -43,9 +40,7 @@ export default function CollectorHomeHost() {
       case "PROFILE":
         return (
           <CollectorProfileScreen
-            // Equivalent to onLogout navigation lambda
             onLogout={() => {
-              // Clear session/local storage here if needed
               router.replace("/login");
             }}
           />
@@ -54,11 +49,9 @@ export default function CollectorHomeHost() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-[80px]">
-      {" "}
-      {/* Padding for BottomBar */}
+    <div className="min-h-screen bg-gray-50 pb-[90px]">
       {/* SCREEN CONTENT */}
-      {/* We use AnimatePresence for a subtle fade effect between tabs (Optional) */}
+      {/* AnimatePresence for smooth fade transitions between tabs */}
       <AnimatePresence mode="wait">
         <motion.div
           key={currentTab}
@@ -70,6 +63,7 @@ export default function CollectorHomeHost() {
           {renderContent()}
         </motion.div>
       </AnimatePresence>
+
       {/* BOTTOM NAVIGATION BAR */}
       <BottomNavigationBar
         currentTab={currentTab}
@@ -80,7 +74,6 @@ export default function CollectorHomeHost() {
 }
 
 // --- SUB-COMPONENT: BOTTOM NAVIGATION BAR ---
-// This mimics Material 3 NavigationBar
 function BottomNavigationBar({
   currentTab,
   onTabChange,
@@ -91,23 +84,24 @@ function BottomNavigationBar({
   const tabs = [
     {
       id: "ACTIVE_JOBS" as Tab,
-      label: "Заявки", // Active Jobs
+      label: "Активные",
       icon: ListTodo,
     },
     {
       id: "MY_JOBS" as Tab,
-      label: "Мои", // My Jobs
+      label: "История",
       icon: CheckCircle,
     },
     {
       id: "PROFILE" as Tab,
-      label: "Профиль", // Profile
+      label: "Профиль",
       icon: User,
     },
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-100 border-t border-slate-200 h-[80px] pb-safe z-50 px-4">
+    // UPDATED: bg-green-50 and border-green-100 to match the Eco theme
+    <div className="fixed bottom-0 left-0 right-0 bg-green-50 border-t border-green-100 h-[80px] pb-safe z-50 px-4 shadow-lg shadow-green-100/50">
       <div className="flex justify-around items-center h-full max-w-md mx-auto">
         {tabs.map((tab) => {
           const isSelected = currentTab === tab.id;
@@ -121,18 +115,18 @@ function BottomNavigationBar({
               {/* Icon Container (The Pill) */}
               <div
                 className={clsx(
-                  "w-16 h-8 rounded-full flex items-center justify-center transition-colors duration-300 mb-1",
+                  "w-16 h-8 rounded-full flex items-center justify-center transition-all duration-300 mb-1",
                   isSelected
-                    ? "bg-green-200" // Secondary Container Color
-                    : "bg-transparent group-hover:bg-slate-200",
+                    ? "bg-green-600 shadow-md shadow-green-200 scale-110" // Active: Dark Green Pill
+                    : "bg-transparent group-hover:bg-green-100", // Inactive: Transparent (Hover Light Green)
                 )}
               >
                 <tab.icon
                   className={clsx(
-                    "w-6 h-6 transition-colors duration-300",
+                    "w-5 h-5 transition-colors duration-300",
                     isSelected
-                      ? "text-green-900" // On Secondary Container
-                      : "text-slate-600", // On Surface Variant
+                      ? "text-white" // Active Icon: White
+                      : "text-green-800/60", // Inactive Icon: Muted Green
                   )}
                 />
               </div>
@@ -140,8 +134,8 @@ function BottomNavigationBar({
               {/* Label */}
               <span
                 className={clsx(
-                  "text-xs font-medium transition-colors duration-300",
-                  isSelected ? "text-green-900 font-bold" : "text-slate-600",
+                  "text-[10px] font-medium transition-colors duration-300",
+                  isSelected ? "text-green-800 font-bold" : "text-green-800/60",
                 )}
               >
                 {tab.label}

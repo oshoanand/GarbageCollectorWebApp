@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "@/lib/providers";
-import FcmInit from "@/components/fcmInit";
 import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Услуги64",
   description: "garbage collection",
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Prevents "pinch to zoom"
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -26,10 +26,7 @@ export default function RootLayout({
       <body
         className={`${inter.className} bg-gray-50 min-h-screen pb-safe select-none`}
       >
-        <Providers>
-          <FcmInit />
-          {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

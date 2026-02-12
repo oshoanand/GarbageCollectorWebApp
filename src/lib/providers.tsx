@@ -3,9 +3,12 @@
 import React, { Suspense } from "react";
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import PushNotificationManager from "@/components/providers/push-notification-manager";
-import { NotificationProvider } from "@/context/NotificationContext";
 import { Toaster } from "@/components/Toaster";
+
+// --- PWA COMPONENTS ---
+import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister"; // <--- Import 1
+import InstallPwaDrawer from "@/components/pwa/InstallPwaDrawer";
+import FcmProvider from "@/components/providers/fcm-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(() => new QueryClient());
@@ -13,11 +16,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
-        <NotificationProvider>
-          <PushNotificationManager />
-          <Suspense>{children}</Suspense>
-          <Toaster />
-        </NotificationProvider>
+        {/* 1. Register Service Worker (Required for PWA Install) */}
+        <ServiceWorkerRegister />
+
+        {/* 2. Initialize FCM (Push Notifications) */}
+        <FcmProvider />
+
+        {/* 3. Show Install Prompt (If applicable) */}
+        <InstallPwaDrawer />
+
+        <Suspense>{children}</Suspense>
+        <Toaster />
       </QueryClientProvider>
     </SessionProvider>
   );

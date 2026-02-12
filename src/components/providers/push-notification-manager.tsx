@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 // 1. Get the VAPID Public Key from env
-const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_KEY;
 
 export default function PushNotificationManager() {
   useEffect(() => {
@@ -22,9 +22,12 @@ export default function PushNotificationManager() {
 
       try {
         // A. Register the Service Worker
-        const register = await navigator.serviceWorker.register("/sw.js", {
-          scope: "/",
-        });
+        const register = await navigator.serviceWorker.register(
+          "/firebase-messaging-sw.js",
+          {
+            scope: "/",
+          },
+        );
 
         // Wait for the service worker to be active
         await navigator.serviceWorker.ready;

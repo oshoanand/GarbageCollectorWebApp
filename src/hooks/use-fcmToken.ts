@@ -7,13 +7,8 @@ import { apiRequest } from "@/services/http/api-client";
 import { toast } from "@/hooks/use-toast";
 import { useSession } from "next-auth/react";
 
-// ------------------------------------------------------------------
-// 1. GET THIS FROM FIREBASE CONSOLE
-// Project Settings > Cloud Messaging > Web configuration > Web Push certificates
-// ------------------------------------------------------------------
+// Project Settings > Cloud Messaging > Web configuration
 const VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_KEY;
-const COLLECTOR_TOPIC = process.env.NEXT_PUBLIC_COLLECTOR_FCM_TOPIC;
-const VISITOR_TOPIC = process.env.NEXT_PUBLIC_VISITOR_FCM_TOPIC;
 
 const useFcmToken = () => {
   const { data: session } = useSession();
@@ -23,9 +18,8 @@ const useFcmToken = () => {
   useEffect(() => {
     const retrieveToken = async () => {
       try {
-        // Ensure we are in the browser and Service Workers are supported
         if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-          // 1. Request User Permission
+          // 1. Check/Request Permission
           const permission = await Notification.requestPermission();
           setNotificationPermissionStatus(permission);
 
@@ -33,7 +27,7 @@ const useFcmToken = () => {
             const msg = await messaging();
             if (!msg) return;
 
-            // 2. Get the FCM Token
+            // 2. Get Token
             const currentToken = await getToken(msg, {
               vapidKey: VAPID_KEY,
             });
@@ -41,17 +35,10 @@ const useFcmToken = () => {
             if (currentToken) {
               console.log("🔥 FCM Token Generated:", currentToken);
 
-              // 3. Save Token to Backend (Link to User)
-              await saveTokenToBackend(currentToken);
-
-              // 4. Subscribe to Topic (e.g., 'collector_jobs')
-              // Only do this if the user is logged in (session exists)
+              // 3. Send to Backend
+              // We only do this if the user is logged in
               if (session?.user) {
-                if (session?.user?.role === "COLLECTOR") {
-                  await subscribeToTopic(currentToken, `${COLLECTOR_TOPIC}`);
-                } else {
-                  await subscribeToTopic(currentToken, `${VISITOR_TOPIC}`);
-                }
+                await syncTokenWithBackend(currentToken);
               }
             }
           }
@@ -62,73 +49,46 @@ const useFcmToken = () => {
     };
 
     retrieveToken();
-  }, [session]); // Re-run if session changes (user logs in)
+  }, [session]); // Re-run when session loads
 
-  // 5. Handle Foreground Messages (App is Open)
+  // 4. Foreground Listener (Unchanged)
   useEffect(() => {
     const setupForegroundListener = async () => {
       try {
         const msg = await messaging();
         if (!msg) return;
 
-        // onMessage receives the payload when the app is in focus
         onMessage(msg, (payload) => {
-          console.log("Foreground Message received:", payload);
-
-          // Display a Toast notification
+          console.log("Foreground Message:", payload);
           toast({
             title: payload.notification?.title || "Новое уведомление",
             description: payload.notification?.body,
-            variant: "default", // You can use "success" if you have that variant
-            duration: 5000,
+            variant: "success",
           });
         });
       } catch (error) {
         console.error("Error setting up foreground listener:", error);
       }
     };
-
     setupForegroundListener();
   }, []);
 
   return { notificationPermissionStatus };
 };
 
-// --- HELPER FUNCTIONS ---
-
 /**
- * Sends the token to your Node.js backend to save it in the database (Prisma)
+ * Sends token to backend. Backend handles DB save AND Topic Subscriptions.
  */
-async function saveTokenToBackend(token: string) {
+async function syncTokenWithBackend(token: string) {
   try {
-    // Adjust this URL to match your API route structure
     await apiRequest({
       method: "POST",
-      url: "/api/fcm/save-fcm", // This maps to your Next.js API route or Node backend
+      url: "/api/fcm/save-fcm",
       data: { token },
     });
-    console.log("✅ Token saved to backend");
+    console.log("✅ Token synced with backend");
   } catch (error) {
-    console.error("❌ Failed to save token:", error);
-  }
-}
-
-/**
- * Tells the backend to subscribe this token to a specific topic (e.g., 'collector_jobs')
- */
-async function subscribeToTopic(token: string, topic: string) {
-  try {
-    await apiRequest({
-      method: "POST",
-      url: "/api/fcm/subscribe",
-      data: {
-        token: token,
-        topic: topic,
-      },
-    });
-    console.log(`✅ Subscribed to topic: ${topic}`);
-  } catch (error) {
-    console.error(`❌ Failed to subscribe to ${topic}:`, error);
+    console.error("❌ Failed to sync token:", error);
   }
 }
 

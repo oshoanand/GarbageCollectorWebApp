@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 
 // --- IMPORT YOUR SCREENS ---
-// We will implement placeholders for these below if you don't have them yet
 import PostJobScreen from "@/components/screens/visitor/PostJobScreen";
 import VisitorMyJobsScreen from "@/components/screens/visitor/VisitorMyJobsScreen";
 import VisitorProfileScreen from "@/components/screens/visitor/VisitorProfileScreen";
@@ -19,13 +18,12 @@ export default function VisitorHomeHost() {
   const router = useRouter();
 
   // 1. Navigation State
-  // Default tab is POST_JOB based on your android code
   const [currentTab, setCurrentTab] = useState<Tab>("POST_JOB");
 
-  // 2. FCM Subscription (Placeholder)
+  // 2. FCM Subscription
   useEffect(() => {
-    // Equivalent to FcmTopicSubscriber
     console.log("Subscribing to topic: USER_ROLE_VISITOR");
+    // In a real PWA: firebase.messaging().subscribe()
   }, []);
 
   // 3. Render Content based on Tab
@@ -33,27 +31,20 @@ export default function VisitorHomeHost() {
     switch (currentTab) {
       case "POST_JOB":
         return (
-          <PostJobScreen
-            // Navigation Callback: Switch to MyJobs tab
-            onNavigateToMyJobs={() => setCurrentTab("MY_JOBS")}
-          />
+          <PostJobScreen onNavigateToMyJobs={() => setCurrentTab("MY_JOBS")} />
         );
       case "MY_JOBS":
         return <VisitorMyJobsScreen />;
       case "PROFILE":
         return (
-          <VisitorProfileScreen
-            // Logout Callback: Redirect to Login
-            onLogout={() => router.replace("/login")}
-          />
+          <VisitorProfileScreen onLogout={() => router.replace("/login")} />
         );
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-[80px]">
-      {" "}
-      {/* Padding for BottomBar */}
+    // Increased padding-bottom to 90px to accommodate the floated nav bar
+    <div className="min-h-screen bg-gray-50 pb-[90px]">
       {/* SCREEN CONTENT */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -66,6 +57,7 @@ export default function VisitorHomeHost() {
           {renderContent()}
         </motion.div>
       </AnimatePresence>
+
       {/* BOTTOM NAVIGATION BAR */}
       <VisitorBottomBar currentTab={currentTab} onTabChange={setCurrentTab} />
     </div>
@@ -83,23 +75,24 @@ function VisitorBottomBar({
   const tabs = [
     {
       id: "POST_JOB" as Tab,
-      label: "Создать", // "Post Job"
+      label: "Создать", // Shortened from "Создать задачу" for better fit
       icon: PlusCircle,
     },
     {
       id: "MY_JOBS" as Tab,
-      label: "Мои заявки", // "My Jobs"
+      label: "Мои задачи",
       icon: ListTodo,
     },
     {
       id: "PROFILE" as Tab,
-      label: "Профиль", // "Profile"
+      label: "Профиль",
       icon: User,
     },
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-[80px] pb-safe z-50 px-4">
+    // THEME UPDATE: bg-green-50, border-green-100, shadow-green-100
+    <div className="fixed bottom-0 left-0 right-0 bg-green-50 border-t border-green-100 h-[80px] pb-safe z-50 px-4 shadow-lg shadow-green-100/50">
       <div className="flex justify-around items-center h-full max-w-md mx-auto">
         {tabs.map((tab) => {
           const isSelected = currentTab === tab.id;
@@ -110,21 +103,21 @@ function VisitorBottomBar({
               onClick={() => onTabChange(tab.id)}
               className="flex flex-col items-center justify-center w-full h-full group"
             >
-              {/* Icon Container (Pill) */}
+              {/* Icon Container (The Pill) */}
               <div
                 className={clsx(
-                  "px-5 py-1.5 rounded-full transition-colors duration-300 mb-1",
+                  "w-16 h-8 rounded-full flex items-center justify-center transition-all duration-300 mb-1",
                   isSelected
-                    ? "bg-green-100" // secondaryContainer color
-                    : "bg-transparent group-hover:bg-gray-100",
+                    ? "bg-green-600 shadow-md shadow-green-200 scale-110" // Active: Dark Green
+                    : "bg-transparent group-hover:bg-green-100", // Inactive: Transparent
                 )}
               >
                 <tab.icon
                   className={clsx(
-                    "w-6 h-6 transition-colors duration-300",
+                    "w-5 h-5 transition-colors duration-300",
                     isSelected
-                      ? "text-green-700" // primary color
-                      : "text-gray-500", // onSurfaceVariant
+                      ? "text-white" // Active Icon: White
+                      : "text-green-800/60", // Inactive Icon: Muted Green
                   )}
                 />
               </div>
@@ -132,8 +125,8 @@ function VisitorBottomBar({
               {/* Label */}
               <span
                 className={clsx(
-                  "text-xs font-medium transition-colors duration-300",
-                  isSelected ? "text-green-700 font-bold" : "text-gray-500",
+                  "text-[10px] font-medium transition-colors duration-300",
+                  isSelected ? "text-green-800 font-bold" : "text-green-800/60",
                 )}
               >
                 {tab.label}

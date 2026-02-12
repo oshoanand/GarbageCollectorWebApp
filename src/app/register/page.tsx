@@ -7,73 +7,75 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { User, Phone, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  User,
+  Phone,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
 import { clsx } from "clsx";
+import { toast } from "sonner";
+import { signIn } from "next-auth/react"; // Used for auto-login after register if needed
 
-import { useRegister, UserRole } from "@/services/user";
+// --- CUSTOM COMPONENTS ---
+import RoleToggler from "@/components/auth/RoleToggler";
+import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 
-// --- Constants ---
-const PRIVACY_POLICY_URL = "https://example.com/privacy"; // Replace with Constant.PRIVACY_POLICY
-const TERMS_URL = "https://example.com/terms"; // Replace with Constant.TERMS
+// --- TYPES & SCHEMA ---
+type UserRole = "VISITOR" | "COLLECTOR";
 
-// --- Zod Validation Schema ---
-// Matches your Kotlin logic: isValidMobile, isValidEmail, etc.
 const registerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(2, "Имя должно содержать минимум 2 буквы"),
   mobile: z
     .string()
-    .regex(
-      /^\+7 \d{3} \d{3} \d{2}-\d{2}$/,
-      "Invalid mobile format (+7 XXX XXX XX-XX)",
-    ),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+    .min(16, "Введите корректный номер телефона") // Length of "+7 999 000-00-00"
+    .regex(/^\+7 \d{3} \d{3} \d{2}-\d{2}$/, "Неверный формат номера"),
+  email: z.string().email("Введите корректный Email"),
+  password: z.string().min(6, "Пароль должен быть не менее 6 символов"),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export default function RegisterScreen() {
+export default function RegisterPage() {
   const router = useRouter();
-  const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.VISITOR);
+
+  // --- STATE ---
+  const [selectedRole, setSelectedRole] = useState<UserRole>("VISITOR");
   const [showPassword, setShowPassword] = useState(false);
+  const [isPhoneFocused, setIsPhoneFocused] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // React Query Mutation
-  const mutation = useRegister((data) => {
-    // onRegisterSuccess logic equivalent
-    router.push("/login"); // or navigate to dashboard directly
-  });
-
-  // Form Handling
+  // --- FORM HOOK ---
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: "",
-      mobile: "", // Initialize empty
+      mobile: "",
       email: "",
       password: "",
     },
+    mode: "onChange", // Validate as user types
   });
 
-  // Handle Submit
-  const onSubmit = (data: RegisterFormValues) => {
-    mutation.mutate({
-      ...data,
-      role: selectedRole,
-    });
-  };
+  // Watch mobile value for checkmark logic
+  const mobileValue = watch("mobile");
 
-  // Mobile Masking Logic (+7 XXX XXX XX-XX)
+  // --- HANDLERS ---
+
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, ""); // Strip non-digits
-    if (value.startsWith("7")) value = value.substring(1); // Remove leading 7 if typed
-
-    // Limit length
+    let value = e.target.value.replace(/\D/g, "");
+    if (value.startsWith("7")) value = value.substring(1);
     value = value.substring(0, 10);
 
     let formatted = "";
@@ -83,85 +85,197 @@ export default function RegisterScreen() {
     if (value.length >= 7) formatted += " " + value.substring(6, 8);
     if (value.length >= 9) formatted += "-" + value.substring(8, 10);
 
+    // Update React Hook Form value manually
     setValue("mobile", formatted, { shouldValidate: true });
   };
 
+  const onSubmit = async (data: RegisterFormValues) => {
+    setIsSubmitting(true);
+
+    // Clean mobile for backend: +7 999 000-00-00 -> 9990000000
+    const cleanMobile = data.mobile.replace(/\D/g, "").slice(-10);
+
+    try {
+      // REPLACE WITH YOUR ACTUAL API CALL
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          mobile: cleanMobile,
+          email: data.email,
+          password: data.password,
+          role: selectedRole,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Ошибка регистрации");
+      }
+
+      toast.success("Регистрация успешна! Входим...");
+
+      // Auto-login after successful registration
+      await signIn("credentials", {
+        mobile: cleanMobile,
+        password: data.password,
+        role: selectedRole,
+        callbackUrl:
+          selectedRole === "COLLECTOR" ? "/collector/jobs" : "/visitor/my-jobs",
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Произошла ошибка при регистрации");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 py-8 overflow-y-auto">
-      {/* 1. Logo Area */}
-      <div className="w-full h-[130px] flex items-center justify-center mb-6">
-        <div className="relative w-[120px] h-[120px]">
-          {/* Ensure you have /public/logo.png or svg */}
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 py-8">
+      {/* 1. LOGO AREA */}
+      <div className="w-full h-[100px] flex items-center justify-center mb-4">
+        <div className="relative w-[100px] h-[100px]">
           <Image
-            src="/logo.png"
-            alt="App Logo"
+            src="/images/logo.svg"
+            alt="Logo"
             fill
             className="object-contain"
-            priority
+            priority={true}
           />
         </div>
       </div>
 
       <div className="w-full max-w-sm flex flex-col items-center">
-        {/* 2. Role Toggler */}
+        {/* 2. ROLE TOGGLER */}
         <RoleToggler selectedRole={selectedRole} onSelect={setSelectedRole} />
 
-        <p className="mt-3 text-sm font-semibold text-green-600">
-          Выберите роль для входа в систему
+        <p className="mt-4 mb-6 text-sm font-medium text-gray-500 text-center">
+          Регистрация как{" "}
+          <span className="font-bold text-green-600">
+            {selectedRole === "VISITOR" ? "Заказчик" : "Исполнитель"}
+          </span>
         </p>
 
-        {/* 3. Form */}
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="w-full mt-8 space-y-4"
-        >
-          {/* Name Field */}
-          <InputField
-            icon={<User className="h-5 w-5 text-gray-400" />}
-            placeholder="Name"
-            type="text"
-            error={errors.name?.message}
-            {...register("name")}
-          />
-
-          {/* Mobile Field (Custom Change Handler) */}
-          <InputField
-            icon={<Phone className="h-5 w-5 text-gray-400" />}
-            placeholder="+7 XXX XXX XX-XX"
-            type="tel"
-            error={errors.mobile?.message}
-            {...register("mobile")}
-            onChange={handleMobileChange} // Override onChange for masking
-          />
-
-          {/* Email Field */}
-          <InputField
-            icon={<Mail className="h-5 w-5 text-gray-400" />}
-            placeholder="Email"
-            type="email"
-            error={errors.email?.message}
-            {...register("email")}
-          />
-
-          {/* Password Field */}
+        {/* 3. FORM */}
+        <form onSubmit={handleSubmit(onSubmit)} className="w-full space-y-4">
+          {/* NAME INPUT */}
           <div className="space-y-1">
-            <div className="relative">
+            <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
+                <User className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
+              </div>
+              <input
+                type="text"
+                placeholder="Ваше имя"
+                className={clsx(
+                  "block w-full pl-10 pr-3 py-3.5 border rounded-xl text-gray-900 transition-all bg-gray-50 outline-none",
+                  errors.name
+                    ? "border-red-500 bg-red-50 focus:ring-red-200"
+                    : "border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:bg-white",
+                )}
+                {...register("name")}
+              />
+            </div>
+            {errors.name && (
+              <p className="text-xs text-red-500 ml-1 mt-0.5 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" /> {errors.name.message}
+              </p>
+            )}
+          </div>
+
+          {/* MOBILE INPUT (Custom Masking) */}
+          <div className="space-y-1">
+            <div className="relative group">
+              {/* Prefix Icon */}
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200">
+                <Phone
+                  className={clsx(
+                    "h-5 w-5 transition-colors",
+                    isPhoneFocused || mobileValue?.length > 0
+                      ? "text-green-600"
+                      : "text-gray-400",
+                  )}
+                />
+              </div>
+
+              <input
+                type="tel"
+                placeholder="+7 XXX XXX XX-XX"
+                {...register("mobile")} // Connect to form
+                onChange={handleMobileChange} // Override onChange for masking
+                onFocus={() => setIsPhoneFocused(true)}
+                onBlur={() => setIsPhoneFocused(false)}
+                className={clsx(
+                  "block w-full pl-10 pr-10 py-3.5 border rounded-xl text-gray-900 transition-all bg-gray-50 outline-none",
+                  errors.mobile
+                    ? "border-red-500 bg-red-50 focus:ring-red-200"
+                    : "border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:bg-white",
+                )}
+              />
+
+              {/* Success Check Icon */}
+              {mobileValue?.length === 16 && !errors.mobile && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none animate-in fade-in zoom-in duration-300">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 fill-green-50" />
+                </div>
+              )}
+            </div>
+            {errors.mobile && (
+              <p className="text-xs text-red-500 ml-1 mt-0.5 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" /> {errors.mobile.message}
+              </p>
+            )}
+          </div>
+
+          {/* EMAIL INPUT */}
+          <div className="space-y-1">
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
+              </div>
+              <input
+                type="email"
+                placeholder="Email адрес"
+                className={clsx(
+                  "block w-full pl-10 pr-3 py-3.5 border rounded-xl text-gray-900 transition-all bg-gray-50 outline-none",
+                  errors.email
+                    ? "border-red-500 bg-red-50 focus:ring-red-200"
+                    : "border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:bg-white",
+                )}
+                {...register("email")}
+              />
+            </div>
+            {errors.email && (
+              <p className="text-xs text-red-500 ml-1 mt-0.5 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" /> {errors.email.message}
+              </p>
+            )}
+          </div>
+
+          {/* PASSWORD INPUT */}
+          <div className="space-y-1">
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-green-600 transition-colors" />
               </div>
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="Password"
+                placeholder="Пароль"
                 className={clsx(
-                  "block w-full pl-10 pr-10 py-3 border rounded-xl text-gray-900 focus:ring-green-500 focus:border-green-500 transition-colors bg-gray-50 outline-none",
-                  errors.password ? "border-red-500" : "border-gray-200",
+                  "block w-full pl-10 pr-10 py-3.5 border rounded-xl text-gray-900 transition-all bg-gray-50 outline-none",
+                  errors.password
+                    ? "border-red-500 bg-red-50 focus:ring-red-200"
+                    : "border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:bg-white",
                 )}
                 {...register("password")}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center hover:text-green-600 transition-colors"
               >
                 {showPassword ? (
                   <EyeOff className="h-5 w-5 text-gray-400" />
@@ -171,62 +285,59 @@ export default function RegisterScreen() {
               </button>
             </div>
             {errors.password && (
-              <p className="text-xs text-red-500 mt-1 ml-1">
+              <p className="text-xs text-red-500 ml-1 mt-0.5 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" />{" "}
                 {errors.password.message}
               </p>
             )}
           </div>
 
-          {/* 4. Disclaimer (Highlighted Text Logic) */}
+          {/* PRIVACY POLICY */}
           <p className="text-xs text-center text-gray-500 px-2 mt-4 leading-relaxed">
-            By signing up, you agree to our{" "}
-            <a
-              href={PRIVACY_POLICY_URL}
+            Регистрируясь, вы соглашаетесь с{" "}
+            <Link
               target="_blank"
-              rel="noreferrer"
-              className="text-green-600 underline font-medium"
+              rel="noopener noreferrer"
+              href="https://klinciti.ru/terms-of-use.html"
+              className="text-green-600 underline font-medium hover:text-green-700"
             >
-              Privacy Policy
-            </a>{" "}
-            and{" "}
-            <a
-              href={TERMS_URL}
+              Условиями использования
+            </Link>{" "}
+            и{" "}
+            <Link
               target="_blank"
-              rel="noreferrer"
-              className="text-green-600 underline font-medium"
+              rel="noopener noreferrer"
+              href="https://klinciti.ru/privacy-policy.html"
+              className="text-green-600 underline font-medium hover:text-green-700"
             >
-              Terms of Use
-            </a>
+              Политикой конфиденциальности
+            </Link>
             .
           </p>
 
-          {/* 5. Server Error Message */}
-          {mutation.isError && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm text-center">
-              {mutation.error?.message ||
-                "Registration failed. Please try again."}
-            </div>
-          )}
-
-          {/* 6. Register Button */}
+          {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            disabled={mutation.isPending}
-            className="w-full flex items-center justify-center py-3.5 px-4 mt-6 border border-transparent rounded-xl shadow-sm text-base font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all"
+            disabled={isSubmitting}
+            className="w-full flex items-center justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-base font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
           >
-            {mutation.isPending ? (
+            {isSubmitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              "Sign Up"
+              "Зарегистрироваться"
             )}
           </button>
         </form>
 
-        {/* 7. Navigate to Login */}
-        <div className="mt-6">
+        {/* 4. SOCIAL BUTTONS */}
+        <SocialLoginButtons userRole={selectedRole} />
+
+        {/* 5. LOGIN LINK */}
+        <div className="mt-8 flex items-center gap-1 text-sm">
+          <span className="text-gray-500">Уже есть аккаунт?</span>
           <Link
             href="/login"
-            className="text-green-600 font-bold hover:underline py-2 px-4"
+            className="font-bold text-green-600 hover:text-green-700 hover:underline transition-all"
           >
             Войти
           </Link>
@@ -235,83 +346,3 @@ export default function RegisterScreen() {
     </div>
   );
 }
-
-// --- SUB-COMPONENT: ROLE TOGGLER ---
-function RoleToggler({
-  selectedRole,
-  onSelect,
-}: {
-  selectedRole: UserRole;
-  onSelect: (r: UserRole) => void;
-}) {
-  return (
-    <div className="bg-gray-100 p-1 rounded-2xl flex relative w-full h-[50px]">
-      <div className="absolute inset-0 p-1 flex">
-        <motion.div
-          className="w-1/2 bg-white rounded-xl shadow-sm"
-          animate={{
-            x: selectedRole === UserRole.VISITOR ? "0%" : "100%",
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
-      </div>
-      <button
-        type="button"
-        onClick={() => onSelect(UserRole.VISITOR)}
-        className={clsx(
-          "flex-1 z-10 text-sm font-bold transition-colors flex items-center justify-center",
-          selectedRole === UserRole.VISITOR ? "text-gray-900" : "text-gray-500",
-        )}
-      >
-        VISITOR
-      </button>
-      <button
-        type="button"
-        onClick={() => onSelect(UserRole.COLLECTOR)}
-        className={clsx(
-          "flex-1 z-10 text-sm font-bold transition-colors flex items-center justify-center",
-          selectedRole === UserRole.COLLECTOR
-            ? "text-gray-900"
-            : "text-gray-500",
-        )}
-      >
-        COLLECTOR
-      </button>
-    </div>
-  );
-}
-
-// --- SUB-COMPONENT: REUSABLE INPUT ---
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  icon: React.ReactNode;
-  error?: string;
-}
-
-// Using forwardRef to work with react-hook-form
-import React, { forwardRef } from "react";
-
-const InputField = forwardRef<HTMLInputElement, InputProps>(
-  ({ icon, error, className, ...props }, ref) => {
-    return (
-      <div className="space-y-1">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            {icon}
-          </div>
-          <input
-            ref={ref}
-            className={clsx(
-              "block w-full pl-10 pr-3 py-3 border rounded-xl text-gray-900 focus:ring-green-500 focus:border-green-500 transition-colors bg-gray-50 outline-none",
-              error ? "border-red-500" : "border-gray-200",
-              className,
-            )}
-            {...props}
-          />
-        </div>
-        {error && <p className="text-xs text-red-500 mt-1 ml-1">{error}</p>}
-      </div>
-    );
-  },
-);
-
-InputField.displayName = "InputField";
