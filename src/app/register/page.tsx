@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import * as z from "zod";
 import {
   User,
@@ -21,7 +21,10 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
-import { signIn } from "next-auth/react"; // Used for auto-login after register if needed
+
+// --- FIREBASE IMPORTS ---
+import { getToken } from "firebase/messaging";
+import { messaging } from "@/lib/firebase"; // Ensure this path is correct
 
 // --- CUSTOM COMPONENTS ---
 import RoleToggler from "@/components/auth/RoleToggler";
@@ -39,7 +42,7 @@ const registerSchema = z.object({
   password: z
     .string()
     .min(8, "Пароль должен быть не менее 8 символов")
-    .regex(/[A-Z]/, "Пароль должен содержать хотя бы одну заглавную букву"), // Requires at least one Uppercase
+    .regex(/[A-Z]/, "Пароль должен содержать хотя бы одну заглавную букву"),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -71,10 +74,9 @@ export default function RegisterPage() {
       email: "",
       password: "",
     },
-    mode: "onChange", // Validate as user types
+    mode: "onChange",
   });
 
-  // Watch mobile value for checkmark logic
   const mobileValue = watch("mobile");
 
   // Redirect if already logged in
@@ -86,7 +88,7 @@ export default function RegisterPage() {
     }
   }, [status, session, router]);
 
-  // Show error from URL if present (e.g. NextAuth redirect)
+  // Show error from URL
   useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam) {
@@ -95,7 +97,6 @@ export default function RegisterPage() {
   }, [searchParams]);
 
   // --- HANDLERS ---
-
   const handleMobileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "");
     if (value.startsWith("7")) value = value.substring(1);
@@ -108,18 +109,38 @@ export default function RegisterPage() {
     if (value.length >= 7) formatted += " " + value.substring(6, 8);
     if (value.length >= 9) formatted += "-" + value.substring(8, 10);
 
-    // Update React Hook Form value manually
     setValue("mobile", formatted, { shouldValidate: true });
   };
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsSubmitting(true);
-
-    // Clean mobile for backend: +7 999 000-00-00 -> 9990000000
     const cleanMobile = data.mobile.replace(/\D/g, "").slice(-10);
 
+    // 1. GET FCM TOKEN (Client Side)
+    let fcmToken = null;
     try {
-      // REPLACE WITH YOUR ACTUAL API CALL
+      // Only run in browser
+      if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+        // Request permission explicitly (optional, but ensures we can get token)
+        const permission = await Notification.requestPermission();
+
+        if (permission === "granted") {
+          const msg = await messaging(); // Get firebase messaging instance
+          if (msg) {
+            fcmToken = await getToken(msg, {
+              vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
+            });
+            console.log("FCM Token retrieved for registration:", fcmToken);
+          }
+        }
+      }
+    } catch (tokenError) {
+      // Don't block registration if FCM fails (e.g. Brave browser, denied permission)
+      console.warn("Could not retrieve FCM token during register:", tokenError);
+    }
+
+    try {
+      // 2. SEND TO BACKEND
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -129,6 +150,7 @@ export default function RegisterPage() {
           email: data.email,
           password: data.password,
           role: selectedRole,
+          fcmToken: fcmToken, // <--- Sent here
         }),
       });
 
@@ -140,7 +162,7 @@ export default function RegisterPage() {
 
       toast.success("Регистрация успешна! Входим...");
 
-      // Auto-login after successful registration
+      // 3. AUTO LOGIN
       await signIn("credentials", {
         mobile: cleanMobile,
         password: data.password,
@@ -157,7 +179,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 py-8">
-      {/* 1. LOGO AREA */}
+      {/* LOGO AREA */}
       <div className="w-full h-[100px] flex items-center justify-center mb-4">
         <div className="relative w-[100px] h-[100px]">
           <Image
@@ -171,7 +193,7 @@ export default function RegisterPage() {
       </div>
 
       <div className="w-full max-w-sm flex flex-col items-center">
-        {/* 2. ROLE TOGGLER */}
+        {/* ROLE TOGGLER */}
         <RoleToggler selectedRole={selectedRole} onSelect={setSelectedRole} />
 
         <p className="mt-4 mb-6 text-sm font-medium text-gray-500 text-center">
@@ -181,7 +203,7 @@ export default function RegisterPage() {
           </span>
         </p>
 
-        {/* 3. FORM */}
+        {/* FORM */}
         <form onSubmit={handleSubmit(onSubmit)} className="w-full space-y-4">
           {/* NAME INPUT */}
           <div className="space-y-1">
@@ -208,10 +230,9 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* MOBILE INPUT (Custom Masking) */}
+          {/* MOBILE INPUT */}
           <div className="space-y-1">
             <div className="relative group">
-              {/* Prefix Icon */}
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors duration-200">
                 <Phone
                   className={clsx(
@@ -226,8 +247,8 @@ export default function RegisterPage() {
               <input
                 type="tel"
                 placeholder="+7 XXX XXX XX-XX"
-                {...register("mobile")} // Connect to form
-                onChange={handleMobileChange} // Override onChange for masking
+                {...register("mobile")}
+                onChange={handleMobileChange}
                 onFocus={() => setIsPhoneFocused(true)}
                 onBlur={() => setIsPhoneFocused(false)}
                 className={clsx(
@@ -237,8 +258,6 @@ export default function RegisterPage() {
                     : "border-gray-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 focus:bg-white",
                 )}
               />
-
-              {/* Success Check Icon */}
               {mobileValue?.length === 16 && !errors.mobile && (
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none animate-in fade-in zoom-in duration-300">
                   <CheckCircle2 className="h-5 w-5 text-green-600 fill-green-50" />
@@ -351,10 +370,8 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {/* 4. SOCIAL BUTTONS */}
         <SocialLoginButtons userRole={selectedRole} />
 
-        {/* 5. LOGIN LINK */}
         <div className="mt-8 flex items-center gap-1 text-sm">
           <span className="text-gray-500">Уже есть аккаунт?</span>
           <Link
