@@ -141,18 +141,21 @@ export default function RegisterPage() {
 
     try {
       // 2. SEND TO BACKEND
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: data.name,
-          mobile: cleanMobile,
-          email: data.email,
-          password: data.password,
-          role: selectedRole,
-          fcmToken: fcmToken, // <--- Sent here
-        }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth/register`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: data.name,
+            mobile: cleanMobile,
+            email: data.email,
+            password: data.password,
+            role: selectedRole,
+            fcmToken: fcmToken,
+          }),
+        },
+      );
 
       const result = await response.json();
 
