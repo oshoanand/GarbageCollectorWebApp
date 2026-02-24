@@ -15,10 +15,15 @@ import {
   X,
   Loader2,
   Wallet,
+  Phone,
+  MessageSquareMore,
+  UserIcon,
 } from "lucide-react";
+
 import { clsx } from "clsx";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 // --- IMPORTS ---
 import { useVisitorJobsQuery, useDeleteJob, Job } from "@/services/jobs";
@@ -247,13 +252,15 @@ function StandardActiveJobCard({
           >
             {getReadableStatus(job.status)}
           </div>
-          <h3 className="font-semibold text-gray-900 leading-tight line-clamp-2">
-            {job.description || "Без описания"}
-          </h3>
         </div>
         <div className="text-lg font-bold text-green-600 whitespace-nowrap">
           {job.cost} ₽
         </div>
+      </div>
+      <div className="mb-4">
+        <h3 className="text-base font-bold text-gray-900 mb-1 leading-snug">
+          {job.description || "Без описания"}
+        </h3>
       </div>
 
       {/* Location */}
@@ -261,8 +268,6 @@ function StandardActiveJobCard({
         <MapPin className="w-3.5 h-3.5 mr-1" />
         <span className="text-xs truncate">{job.location}</span>
       </div>
-
-      <div className="h-px bg-gray-100 mb-3" />
 
       {/* Actions */}
       <div className="flex items-center justify-between">
@@ -278,10 +283,12 @@ function StandardActiveJobCard({
           <div className="flex gap-2">
             <button
               onClick={onViewProofImage}
-              className="text-xs font-bold text-gray-500 hover:text-gray-900 px-2 py-1"
+              className="flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 active:scale-95 transition-transform"
             >
+              <ImageIcon className="w-3.5 h-3.5 mr-1.5" />
               Пруф
             </button>
+
             <button
               onClick={() =>
                 toast({
@@ -304,6 +311,51 @@ function StandardActiveJobCard({
             Отменить
           </button>
         )}
+      </div>
+
+      <div className="mt-2 pt-2 border-t border-gray-100 animate-in fade-in duration-500">
+        <span className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">
+          Контакт для оплаты
+        </span>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* Avatar */}
+            <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden border border-gray-200">
+              {job.finishedBy?.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={job.finishedBy.image}
+                  alt="User"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <UserIcon className="w-4 h-4" />
+                </div>
+              )}
+            </div>
+            <span className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">
+              {job.finishedBy?.name || "Исполнитель"}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {/* Call Button */}
+            <a
+              href={`tel:+7${job.finishedBy?.mobile}`}
+              className="flex items-center px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-200 transition-colors"
+            >
+              <Phone className="w-3 h-3" />
+            </a>
+            {/* chat button */}
+            <Link
+              href={`/chat/${job.finishedBy?.id}`}
+              className="flex items-center px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-200 transition-colors"
+            >
+              <MessageSquareMore className="w-3 h-3 " />
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

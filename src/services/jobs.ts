@@ -16,6 +16,13 @@ export interface Job {
   jobPhotoDone: string | null;
   createdAt: string;
   postedBy: {
+    id: string;
+    name: string | null;
+    mobile: string;
+    image: string | null;
+  };
+  finishedBy?: {
+    id: string;
     name: string | null;
     mobile: string;
     image: string | null;

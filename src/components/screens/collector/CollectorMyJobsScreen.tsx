@@ -12,9 +12,11 @@ import {
   AlertCircle,
   Phone,
   Loader2,
+  MessageSquareMore,
   User as UserIcon,
 } from "lucide-react";
 import { clsx } from "clsx";
+import Link from "next/link";
 
 // --- IMPORTS ---
 import { useJobHistoryQuery, Job } from "@/services/jobs";
@@ -221,19 +223,34 @@ function CollectorHistoryCard({ job }: { job: Job }) {
                   </div>
                 )}
               </div>
-              <span className="text-sm font-semibold text-gray-900 truncate max-w-[120px]">
+              <span className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">
                 {job.postedBy.name || "Заказчик"}
               </span>
             </div>
-
+            <div className="flex gap-2">
+              {/* Call Button */}
+              <a
+                href={`tel:+7${job.postedBy.mobile}`}
+                className="flex items-center px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-200 transition-colors"
+              >
+                <Phone className="w-3 h-3" />
+              </a>
+              {/* chat button */}
+              <Link
+                href={`/chat/${job.postedBy?.id}`}
+                className="flex items-center px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-200 transition-colors"
+              >
+                <MessageSquareMore className="w-3 h-3 " />
+              </Link>
+            </div>
             {/* Call Button */}
-            <a
+            {/* <a
               href={`tel:+7${job.postedBy.mobile}`}
               className="flex items-center px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-200 transition-colors"
             >
               <Phone className="w-3 h-3 mr-1.5" />
               Позвонить
-            </a>
+            </a> */}
           </div>
         </div>
       )}

@@ -96,6 +96,6 @@ export const config = {
      * - images, icons, public (assets)
      * - firebase-messaging-sw.js (Service Worker - CRITICAL to exclude)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|images|icons|public|login|register|reset-password|firebase-messaging-sw.js|manifest.json).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|images|icons|public|sounds|login|register|reset-password|firebase-messaging-sw.js|manifest.json).*)",
   ],
 };

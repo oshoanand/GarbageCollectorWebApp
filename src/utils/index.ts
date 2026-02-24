@@ -1,3 +1,6 @@
+import { format, formatDistanceToNow } from "date-fns";
+import { ru } from "date-fns/locale";
+
 // --- HELPER: FORMAT PHONE NUMBER ---
 export const formatPhoneNumber = (phone: string) => {
   if (!phone) return "";
@@ -21,4 +24,16 @@ export const formatPhoneNumber = (phone: string) => {
   }
 
   return phone; // Return original if format doesn't match
+};
+
+export const formatDateHeader = (dateString: string) => {
+  const date = new Date(dateString);
+  const today = new Date().toDateString();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today) return "Сегодня";
+  if (date.toDateString() === yesterday.toDateString()) return "Вчера";
+
+  return format(date, "d MMMM", { locale: ru });
 };
