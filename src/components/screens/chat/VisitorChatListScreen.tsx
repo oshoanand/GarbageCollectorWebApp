@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { Loader2, MessageSquare, UserCircle, Search } from "lucide-react";
@@ -30,6 +30,7 @@ export default function VisitorChatListScreen({
   const userId = session?.user?.id;
 
   // 1. Zustand Selectors
+  const socket = useChatStore((state) => state.socket); // <--Need socket for live updates
   const refreshTrigger = useChatStore((state) => state.refreshTrigger);
   const onlineUsers = useChatStore((state) => state.onlineUsers);
   const lastSeenMap = useChatStore((state) => state.lastSeenMap);
@@ -44,45 +45,69 @@ export default function VisitorChatListScreen({
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 2. Optimized Data Fetching
-  const fetchSessions = async (isSilent = false) => {
-    if (!userId) return;
-    if (!isSilent) setLoading(true);
+  // 2. Optimized Data Fetching (Wrapped in useCallback to use in multiple places)
+  const fetchSessions = useCallback(
+    async (isSilent = false) => {
+      if (!userId) return;
+      if (!isSilent) setLoading(true);
 
-    try {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8800";
-      const { data } = await axios.get(
-        `${API_URL}/api/chat/sessions?userId=${userId}`,
-      );
+      try {
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8800";
+        const { data } = await axios.get(
+          `${API_URL}/api/chat/sessions?userId=${userId}`,
+        );
 
-      // Sync both Online Status and Last Seen timestamps to Global Store
-      const currentlyOnline: string[] = [];
-      const lastSeenData: Record<string, string> = {};
+        // Sync both Online Status and Last Seen timestamps to Global Store
+        const currentlyOnline: string[] = [];
+        const lastSeenData: Record<string, string> = {};
 
-      data.forEach((s: ChatSession) => {
-        if (s.isOnline) {
-          currentlyOnline.push(s.collectorId);
-        } else if (s.lastSeen) {
-          lastSeenData[s.collectorId] = s.lastSeen;
-        }
-      });
+        data.forEach((s: ChatSession) => {
+          if (s.isOnline) {
+            currentlyOnline.push(s.collectorId);
+          } else if (s.lastSeen) {
+            lastSeenData[s.collectorId] = s.lastSeen;
+          }
+        });
 
-      // Bulk update the store to prevent multiple re-renders
-      setOnlineStatusBulk(currentlyOnline, lastSeenData);
-      setSessions(data);
-    } catch (error) {
-      console.error("Error fetching sessions:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        // Bulk update the store to prevent multiple re-renders
+        setOnlineStatusBulk(currentlyOnline, lastSeenData);
+        setSessions(data);
+      } catch (error) {
+        console.error("Error fetching sessions:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [userId, setOnlineStatusBulk],
+  );
 
+  // Initial fetch and manual refresh trigger
   useEffect(() => {
     fetchSessions(sessions.length > 0);
-  }, [userId, refreshTrigger]);
+  }, [fetchSessions, refreshTrigger, sessions.length]);
 
-  // 3. Simple Search Logic
+  // --- NEW: 3. REAL-TIME SOCKET SYNC ---
+  // Keeps the list perfectly accurate if messages arrive or are read while on this screen
+  useEffect(() => {
+    if (!socket || !userId) return;
+
+    const handleSilentRefresh = () => {
+      fetchSessions(true); // Refetch list in the background without showing the loader
+    };
+
+    socket.on("receive_message", handleSilentRefresh);
+    socket.on("read_status_synced", handleSilentRefresh);
+    socket.on("messages_read_by_recipient", handleSilentRefresh);
+
+    return () => {
+      socket.off("receive_message", handleSilentRefresh);
+      socket.off("read_status_synced", handleSilentRefresh);
+      socket.off("messages_read_by_recipient", handleSilentRefresh);
+    };
+  }, [socket, userId, fetchSessions]);
+
+  // 4. Simple Search Logic
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) =>
       s.collectorName.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -124,11 +149,22 @@ export default function VisitorChatListScreen({
             <ChatListItem
               key={chat.collectorId}
               chat={chat}
-              // We prioritize the Live State from our Zustand Store
               isOnline={onlineUsers.has(chat.collectorId)}
               realTimeLastSeen={lastSeenMap[chat.collectorId]}
               onClick={() => {
+                // 1. Decrease global unread count (bottom nav badge)
                 decreaseUnreadCount(chat.unreadCount);
+
+                // 2. OPTIMISTIC UPDATE: Instantly wipe the local unread count so it's gone when you come back
+                setSessions((prev) =>
+                  prev.map((s) =>
+                    s.collectorId === chat.collectorId
+                      ? { ...s, unreadCount: 0 }
+                      : s,
+                  ),
+                );
+
+                // 3. Navigate to detail screen
                 onNavigateToDetail(chat.collectorId);
               }}
             />
@@ -140,6 +176,7 @@ export default function VisitorChatListScreen({
 }
 
 // --- SUB-COMPONENT: CHAT ITEM ---
+// (No changes needed in the UI rendering of the list item)
 function ChatListItem({
   chat,
   isOnline,
@@ -151,7 +188,6 @@ function ChatListItem({
   realTimeLastSeen?: string;
   onClick: () => void;
 }) {
-  // Use real-time timestamp from store if available, otherwise fallback to API data
   const lastActive = realTimeLastSeen || chat.lastSeen || chat.lastMessageTime;
 
   return (
@@ -195,7 +231,7 @@ function ChatListItem({
         <div className="flex items-center gap-2">
           {isOnline ? (
             <span className="text-[11px] text-green-600 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />{" "}
               В сети
             </span>
           ) : (

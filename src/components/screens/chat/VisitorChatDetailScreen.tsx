@@ -98,6 +98,20 @@ export default function VisitorChatDetailScreen({
     if (allMessages.length > 0 && !isFetchingNextPage) scrollToBottom();
   }, [allMessages.length]);
 
+  // --- CLEAR UNREAD BADGE ON MOUNT ---
+  useEffect(() => {
+    if (socket?.connected && userId && partnerId) {
+      // 1. Tell the database to mark all previous messages from this partner as read
+      socket.emit("mark_messages_read", {
+        readerId: userId,
+        senderId: partnerId,
+      });
+
+      // 2. Instantly update the global Zustand store so the badge disappears from the bottom tab
+      useChatStore.getState().syncUnreadCount(userId);
+    }
+  }, [socket, userId, partnerId]);
+
   // --- DATA TRANSFORMATION (WhatsApp-style Grouping) ---
   const groupedMessages = useMemo(() => {
     const groups: { type: "date" | "message"; value: any; id: string }[] = [];
