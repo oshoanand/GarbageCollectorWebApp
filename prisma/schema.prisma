@@ -81,6 +81,7 @@ model User {
     userStatus         String?
     fcmToken           String?
     createdAt          DateTime            @default(now())
+    updatedAt          DateTime?
     accounts           Account[]
     sessions           Session[]
     verificationTokens VerificationToken[]
@@ -88,6 +89,11 @@ model User {
     tokens             Token[]
     jobPostedBy        Job[]               @relation("JobPostedBy")
     jobFinishedBy      Job[]               @relation("JobFinishedBy")
+
+    // Relations for the universal chat
+    chatsAsUser1 ChatSession[] @relation("ChatUser1")
+    chatsAsUser2 ChatSession[] @relation("ChatUser2")
+    messagesSent ChatMessage[]
 }
 
 model Support {
@@ -188,4 +194,59 @@ model NotificationLog {
     errorDetails String?
 
     @@index([sentAt]) // Optimize sorting by date
+}
+
+model ChatSession {
+    id String @id @default(cuid())
+
+    // The alphabetically smaller ID always goes here
+    user1Id String
+    user1   User   @relation("ChatUser1", fields: [user1Id], references: [id])
+
+    // The alphabetically larger ID always goes here
+    user2Id String
+    user2   User   @relation("ChatUser2", fields: [user2Id], references: [id])
+
+    status   String        @default("OPEN")
+    messages ChatMessage[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // CRITICAL: This perfectly ensures only ONE chat thread exists between ANY two users
+    @@unique([user1Id, user2Id])
+}
+
+// model ChatMessage {
+//   id     String  @id @default(cuid())
+//   text   String
+//   isRead Boolean @default(false)
+
+//   senderId String
+//   sender   User   @relation(fields: [senderId], references: [id])
+
+//   chatSessionId String
+//   session       ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+//   readAt    DateTime?
+//   createdAt DateTime  @default(now())
+// }
+
+model ChatMessage {
+    id            String    @id @default(cuid())
+    chatSessionId String
+    senderId      String
+    text          String? // Made optional for image-only messages
+    imageUrl      String? // Added for images
+    isRead        Boolean   @default(false)
+    readAt        DateTime?
+    createdAt     DateTime  @default(now())
+
+    // Self-relation for replies
+    replyToId String?
+    replyTo   ChatMessage?  @relation("MessageReplies", fields: [replyToId], references: [id])
+    replies   ChatMessage[] @relation("MessageReplies")
+
+    session ChatSession @relation(fields: [chatSessionId], references: [id])
+    sender  User        @relation(fields: [senderId], references: [id])
 }
